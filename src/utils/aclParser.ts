@@ -89,16 +89,17 @@ export function parseAclText(cliText: string): ParseOutput {
   const rules: ACLRule[] = [];
   const errors: ParseError[] = [];
 
-  let currentMode: 'extended' | 'standard' = 'extended';
+  let isStandardAcl = false;
   let aclHeader: string | undefined;
   let nextAutoSeq = 10;
 
-  lines.forEach((rawLine, idx) => {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const rawLine = lines[idx];
     const lineNumber = idx + 1;
     const trimmed = rawLine.trim();
 
     if (!trimmed || trimmed.startsWith('!') || trimmed.startsWith('#')) {
-      return;
+      continue;
     }
 
     const tokens = trimmed.split(/\s+/);
@@ -106,7 +107,7 @@ export function parseAclText(cliText: string): ParseOutput {
 
     // Ignore remark lines
     if (firstLower === 'remark') {
-      return;
+      continue;
     }
 
     // Check Named ACL header: ip access-list <standard|extended> <NAME>
@@ -117,22 +118,22 @@ export function parseAclText(cliText: string): ParseOutput {
       const typeTok = tokens[2]?.toLowerCase();
       const nameTok = tokens[3];
       if ((typeTok === 'standard' || typeTok === 'extended') && nameTok) {
-        currentMode = typeTok;
+        isStandardAcl = typeTok === 'standard';
         aclHeader = `ip access-list ${typeTok} ${nameTok}`;
-        return;
+        continue;
       } else {
         errors.push({
           lineNumber,
           lineText: rawLine,
           message: 'Syntax: ip access-list <standard|extended> <NAME>',
         });
-        return;
+        continue;
       }
     }
 
     let cursor = 0;
     let explicitSeq: number | undefined;
-    let lineIsStandard = currentMode === 'standard';
+    let lineIsStandard = isStandardAcl;
     let lineAclHeader = aclHeader;
 
     // Optional leading sequence number (e.g., "10 permit tcp ...")
@@ -150,25 +151,25 @@ export function parseAclText(cliText: string): ParseOutput {
           lineText: rawLine,
           message: 'Expected numeric ACL ID (1-99 or 100-199) after "access-list"',
         });
-        return;
+        continue;
       }
       const aclNum = parseInt(aclNumStr, 10);
       if (tokens[cursor + 2]?.toLowerCase() === 'remark') {
-        return;
+        continue;
       }
       if ((aclNum >= 1 && aclNum <= 99) || (aclNum >= 1300 && aclNum <= 1999)) {
         lineIsStandard = true;
-        currentMode = 'standard';
+        isStandardAcl = true;
       } else if ((aclNum >= 100 && aclNum <= 199) || (aclNum >= 2000 && aclNum <= 2699)) {
         lineIsStandard = false;
-        currentMode = 'extended';
+        isStandardAcl = false;
       } else {
         errors.push({
           lineNumber,
           lineText: rawLine,
           message: `ACL number ${aclNum} out of standard (1-99) or extended (100-199) range`,
         });
-        return;
+        continue;
       }
       lineAclHeader = `access-list ${aclNum}`;
       if (!aclHeader) {
@@ -185,13 +186,12 @@ export function parseAclText(cliText: string): ParseOutput {
         lineText: rawLine,
         message: `Expected "permit" or "deny", found "${tokens[cursor] ?? ''}"`,
       });
-      return;
+      continue;
     }
     const action: Action = actionTok;
     cursor++;
 
     // Determine whether this ACE is Standard or Extended
-    // Notice: if in named standard mode OR numbered standard ACL, or if next token is NOT a protocol name, handle standard
     const maybeProto = tokens[cursor]?.toLowerCase();
     const isProtocolToken =
       maybeProto === 'tcp' ||
@@ -211,7 +211,7 @@ export function parseAclText(cliText: string): ParseOutput {
           lineText: rawLine,
           message: srcParsed.error,
         });
-        return;
+        continue;
       }
 
       if (srcParsed.nextIndex < tokens.length) {
@@ -220,7 +220,7 @@ export function parseAclText(cliText: string): ParseOutput {
           lineText: rawLine,
           message: `Unexpected trailing token(s) in Standard ACL: "${tokens.slice(srcParsed.nextIndex).join(' ')}"`,
         });
-        return;
+        continue;
       }
 
       rules.push({
@@ -236,7 +236,7 @@ export function parseAclText(cliText: string): ParseOutput {
         aclHeader: lineAclHeader,
         isStandard: true,
       });
-      return;
+      continue;
     }
 
     // Extended ACL: <permit|deny> <protocol> <src> <dst> [eq <port>] [established] [echo|echo-reply]
@@ -246,7 +246,7 @@ export function parseAclText(cliText: string): ParseOutput {
         lineText: rawLine,
         message: `Expected protocol (tcp, udp, icmp, ip), found "${tokens[cursor] ?? ''}"`,
       });
-      return;
+      continue;
     }
 
     const protocol = maybeProto as Protocol;
@@ -260,7 +260,7 @@ export function parseAclText(cliText: string): ParseOutput {
         lineText: rawLine,
         message: `Source address error: ${srcParsed.error}`,
       });
-      return;
+      continue;
     }
     cursor = srcParsed.nextIndex;
 
@@ -272,7 +272,7 @@ export function parseAclText(cliText: string): ParseOutput {
         lineText: rawLine,
         message: `Destination address error: ${dstParsed.error}`,
       });
-      return;
+      continue;
     }
     cursor = dstParsed.nextIndex;
 
@@ -281,6 +281,7 @@ export function parseAclText(cliText: string): ParseOutput {
     let icmpType: 'echo' | 'echo-reply' | undefined;
 
     // Parse optional trailing modifiers: [eq <port>], [established], [echo | echo-reply]
+    let modifierError = false;
     while (cursor < tokens.length) {
       const mod = tokens[cursor].toLowerCase();
       if (mod === 'eq') {
@@ -291,7 +292,8 @@ export function parseAclText(cliText: string): ParseOutput {
             lineText: rawLine,
             message: 'Expected port number or service name after "eq"',
           });
-          return;
+          modifierError = true;
+          break;
         }
         const parsedPort = parsePortToken(portTok);
         if (parsedPort === undefined) {
@@ -300,7 +302,8 @@ export function parseAclText(cliText: string): ParseOutput {
             lineText: rawLine,
             message: `Unknown or invalid TCP/UDP port "${portTok}"`,
           });
-          return;
+          modifierError = true;
+          break;
         }
         dstPort = parsedPort;
         cursor += 2;
@@ -311,7 +314,8 @@ export function parseAclText(cliText: string): ParseOutput {
             lineText: rawLine,
             message: '"established" keyword is only valid for TCP rules',
           });
-          return;
+          modifierError = true;
+          break;
         }
         established = true;
         cursor += 1;
@@ -322,7 +326,8 @@ export function parseAclText(cliText: string): ParseOutput {
             lineText: rawLine,
             message: `"${mod}" keyword is only valid for ICMP rules`,
           });
-          return;
+          modifierError = true;
+          break;
         }
         icmpType = mod;
         cursor += 1;
@@ -332,8 +337,13 @@ export function parseAclText(cliText: string): ParseOutput {
           lineText: rawLine,
           message: `Unrecognized trailing option "${tokens[cursor]}"`,
         });
-        return;
+        modifierError = true;
+        break;
       }
+    }
+
+    if (modifierError) {
+      continue;
     }
 
     rules.push({
@@ -352,13 +362,13 @@ export function parseAclText(cliText: string): ParseOutput {
       aclHeader: lineAclHeader,
       isStandard: false,
     });
-  });
+  }
 
   return {
     rules,
     errors,
     aclHeader,
-    isStandardAcl: currentMode === 'standard',
+    isStandardAcl,
   };
 }
 
