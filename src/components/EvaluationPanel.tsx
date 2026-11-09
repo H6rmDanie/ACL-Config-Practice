@@ -9,7 +9,7 @@ import {
   ArrowRight,
   Crosshair,
 } from 'lucide-react';
-import { TestCase, TraceResult } from '../types/acl';
+import { ACLRule, TestCase, TraceResult } from '../types/acl';
 import { formatRuleAddress } from '../utils/ipEngine';
 
 export interface EvaluatedTestCase {
@@ -153,8 +153,8 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
               {/* Step-by-Step Sequential Evaluation List */}
               <div className="space-y-1.5">
                 {activeTrace.steps.map((step, idx) => {
-                  const isImplicit = step.rule === 'implicit-deny';
-                  const ruleObj = isImplicit ? null : step.rule;
+                  const ruleObj: ACLRule | null =
+                    step.rule === 'implicit-deny' ? null : step.rule;
 
                   return (
                     <div
@@ -181,32 +181,32 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
                             {step.matched ? `MATCH → ${step.action}` : 'NO MATCH'}
                           </span>
                           <span className="text-slate-200 font-semibold">
-                            {isImplicit
+                            {!ruleObj
                               ? '[Implicit] deny ip any any'
-                              : `[Seq ${ruleObj!.sequenceNumber}] ${ruleObj!.action} ${
-                                  ruleObj!.protocol
+                              : `[Seq ${ruleObj.sequenceNumber}] ${ruleObj.action} ${
+                                  ruleObj.protocol
                                 } ${formatRuleAddress(
-                                  ruleObj!.srcIp,
-                                  ruleObj!.srcWildcard
+                                  ruleObj.srcIp,
+                                  ruleObj.srcWildcard
                                 )} ${
-                                  ruleObj!.isStandard
+                                  ruleObj.isStandard
                                     ? ''
                                     : formatRuleAddress(
-                                        ruleObj!.dstIp,
-                                        ruleObj!.dstWildcard
+                                        ruleObj.dstIp,
+                                        ruleObj.dstWildcard
                                       )
                                 }${
-                                  ruleObj!.dstPort !== undefined
-                                    ? ` eq ${ruleObj!.dstPort}`
+                                  ruleObj.dstPort !== undefined
+                                    ? ` eq ${ruleObj.dstPort}`
                                     : ''
-                                }${ruleObj!.established ? ' established' : ''}${
-                                  ruleObj!.icmpType ? ` ${ruleObj!.icmpType}` : ''
+                                }${ruleObj.established ? ' established' : ''}${
+                                  ruleObj.icmpType ? ` ${ruleObj.icmpType}` : ''
                                 }`}
                           </span>
                         </div>
 
                         {/* Granular Bitwise & Header Check Badges */}
-                        {step.details && !isImplicit && (
+                        {step.details && ruleObj && (
                           <div className="flex items-center gap-1 text-[10px]">
                             <span
                               className={`px-1.5 py-0.5 rounded border ${
@@ -226,7 +226,7 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
                             >
                               SrcMask {step.details.srcMatch ? '✓' : '✗'}
                             </span>
-                            {!ruleObj?.isStandard && (
+                            {!ruleObj.isStandard && (
                               <span
                                 className={`px-1.5 py-0.5 rounded border ${
                                   step.details.dstMatch
@@ -237,9 +237,9 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
                                 DstMask {step.details.dstMatch ? '✓' : '✗'}
                               </span>
                             )}
-                            {(ruleObj?.dstPort !== undefined ||
-                              ruleObj?.established ||
-                              ruleObj?.icmpType) && (
+                            {(ruleObj.dstPort !== undefined ||
+                              ruleObj.established ||
+                              ruleObj.icmpType) && (
                               <span
                                 className={`px-1.5 py-0.5 rounded border ${
                                   step.details.portMatch && step.details.flagsMatch
@@ -272,10 +272,11 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
             {testResults.map((item) => {
               const { testCase, trace, passed } = item;
               const matchedStep = trace.steps[trace.steps.length - 1];
+              const lastRule = matchedStep.rule;
               const matchedRuleLabel =
-                matchedStep.rule === 'implicit-deny'
+                lastRule === 'implicit-deny'
                   ? 'Implicit Deny'
-                  : `Seq ${matchedStep.rule.sequenceNumber}`;
+                  : `Seq ${lastRule.sequenceNumber}`;
 
               return (
                 <div
