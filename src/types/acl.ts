@@ -77,7 +77,7 @@ export interface LabScenario {
   targetInterface: string;
   direction: 'inbound' | 'outbound';
   initialAclText: string;
-  solutionAclText?: string;
+  solutionAclText: string;
   tasks?: string[];
   topology: {
     nodes: TopologyNode[];

@@ -275,7 +275,9 @@ export const EvaluationPanel: React.FC<EvaluationPanelProps> = ({
               const lastRule = matchedStep.rule;
               const matchedRuleLabel =
                 lastRule === 'implicit-deny'
-                  ? 'Implicit Deny'
+                  ? trace.steps.length === 1
+                    ? 'Empty ACL — Implicit Deny'
+                    : 'Implicit Deny'
                   : `Seq ${lastRule.sequenceNumber}`;
 
               return (

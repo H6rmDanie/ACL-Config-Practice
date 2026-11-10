@@ -15,10 +15,10 @@ export const scenarios: LabScenario[] = [
       'Permit ICMP traffic from 192.168.1.0/24 to gateway interface host 192.168.1.1.',
       'Ensure all other traffic to the DMZ Database (10.0.0.20) or other VLANs is denied (via explicit rule or implicit deny).',
     ],
-    initialAclText: `ip access-list extended DMZ_ISOLATION
- 10 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.10 eq 80
- 20 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.10 eq 443
- 30 permit icmp 192.168.1.0 0.0.0.255 host 192.168.1.1`,
+    initialAclText: `! Extended ACL - Web Server DMZ Isolation
+! Enter your configuration here
+ip access-list extended DMZ_ISOLATION
+`,
     solutionAclText: `ip access-list extended DMZ_ISOLATION
  10 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.10 eq 80
  20 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.10 eq 443
@@ -178,8 +178,9 @@ export const scenarios: LabScenario[] = [
       'Ensure other hosts on the same 192.168.10.0/24 subnet (e.g., 192.168.10.50) are denied.',
       'Ensure remote subnets such as Engineering (192.168.20.0/24) are denied.',
     ],
-    initialAclText: `access-list 10 permit host 192.168.10.5
-access-list 10 deny any`,
+    initialAclText: `! Standard ACL - Management VTY Access
+! Enter your configuration here (e.g., access-list 10 permit ...)
+`,
     solutionAclText: `access-list 10 permit host 192.168.10.5
 access-list 10 deny any`,
     topology: {
@@ -311,11 +312,10 @@ access-list 10 deny any`,
       'Permit UDP DNS traffic (eq 53) to/from DNS infrastructure.',
       'Rely on implicit deny (or explicit deny ip any any) to drop unestablished external connection attempts.',
     ],
-    initialAclText: `ip access-list extended WAN_HARDENING
- 10 deny tcp 203.0.113.0 0.0.0.255 any eq 23
- 20 deny icmp 203.0.113.0 0.0.0.255 any echo
- 30 permit tcp any any established
- 40 permit udp any any eq 53`,
+    initialAclText: `! Security Hardening - Block Specific Attack Vectors
+! Enter your configuration here
+ip access-list extended WAN_HARDENING
+`,
     solutionAclText: `ip access-list extended WAN_HARDENING
  10 deny tcp 203.0.113.0 0.0.0.255 any eq 23
  20 deny icmp 203.0.113.0 0.0.0.255 any echo

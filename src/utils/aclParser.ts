@@ -99,6 +99,10 @@ export function parseAclText(cliText: string): ParseOutput {
     const trimmed = rawLine.trim();
 
     if (!trimmed || trimmed.startsWith('!') || trimmed.startsWith('#')) {
+      if (!aclHeader && trimmed.toLowerCase().includes('standard acl')) {
+        isStandardAcl = true;
+        aclHeader = 'access-list 10';
+      }
       continue;
     }
 

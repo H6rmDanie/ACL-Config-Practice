@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { scenarios } from './data/scenarios';
 import { LabScenario, Packet } from './types/acl';
 import { parseAclText } from './utils/aclParser';
@@ -12,8 +12,11 @@ import {
   EvaluatedTestCase,
   EvaluationPanel,
 } from './components/EvaluationPanel';
+import { LandingPage } from './components/LandingPage';
 
 export function App() {
+  const [view, setView] = useState<'landing' | 'simulator'>('landing');
+
   const [activeScenarioId, setActiveScenarioId] = useState<string>(
     scenarios[0].id
   );
@@ -24,11 +27,14 @@ export function App() {
     [activeScenarioId]
   );
 
-  // Per-scenario CLI text buffer state
+  // Per-scenario CLI text buffer state — initialized strictly with blank/starter text, never the solution
   const [cliByScenario, setCliByScenario] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(scenarios.map((s) => [s.id, s.initialAclText]))
   );
+
+  // Optional Solution Viewer state (locked/hidden by default)
+  const [showSolution, setShowSolution] = useState<boolean>(false);
 
   const currentCliText =
     cliByScenario[activeScenario.id] ?? activeScenario.initialAclText;
@@ -65,18 +71,22 @@ export function App() {
     [tracedPacket, parsedAcl.rules]
   );
 
-  // Evaluate all scenario test cases against current ACL rules
+  // Evaluate all scenario test cases against current ACL rules.
+  // When the editor is in its empty starter state (0 rules), test cases do not pass by default.
+  const hasConfiguredRules = parsedAcl.rules.length > 0;
+
   const testResults: EvaluatedTestCase[] = useMemo(() => {
     return activeScenario.testCases.map((tc) => {
       const trace = evaluatePacket(tc.packet, parsedAcl.rules);
-      const passed = trace.finalAction === tc.expectedAction;
+      const passed =
+        hasConfiguredRules && trace.finalAction === tc.expectedAction;
       return {
         testCase: tc,
         trace,
         passed,
       };
     });
-  }, [activeScenario, parsedAcl.rules]);
+  }, [activeScenario, parsedAcl.rules, hasConfiguredRules]);
 
   const passingCount = useMemo(
     () => testResults.filter((r) => r.passed).length,
@@ -87,14 +97,19 @@ export function App() {
     const nextScenario =
       scenarios.find((s) => s.id === scenarioId) ?? scenarios[0];
     setActiveScenarioId(nextScenario.id);
+    setShowSolution(false);
     const defaultPkt = { ...nextScenario.testCases[0].packet };
     setCraftedPacket(defaultPkt);
     setTracedPacket(defaultPkt);
   };
 
+  const handleStartScenarioFromLanding = (scenarioId: string) => {
+    handleSelectScenario(scenarioId);
+    setView('simulator');
+  };
+
   const handleVerifyLab = () => {
     setBottomTab('suite');
-    // Highlight the first failing test case on the topology if any fail, otherwise first test case
     const firstFailed = testResults.find((r) => !r.passed);
     if (firstFailed) {
       setTracedPacket({ ...firstFailed.testCase.packet });
@@ -106,9 +121,15 @@ export function App() {
 
   const handleResetScenario = () => {
     setCurrentCliText(activeScenario.initialAclText);
+    setShowSolution(false);
+    setBottomTab('trace');
     const defaultPkt = { ...activeScenario.testCases[0].packet };
     setCraftedPacket(defaultPkt);
     setTracedPacket(defaultPkt);
+  };
+
+  const handleLoadSolution = () => {
+    setCurrentCliText(activeScenario.solutionAclText);
   };
 
   const handleTracePacket = (pkt?: Packet) => {
@@ -134,6 +155,16 @@ export function App() {
     setBottomTab('trace');
   };
 
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        scenarios={scenarios}
+        onLaunchApp={() => setView('simulator')}
+        onStartScenario={handleStartScenarioFromLanding}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden lg:overflow-hidden">
       {/* 1. Header Bar */}
@@ -143,6 +174,7 @@ export function App() {
         onSelectScenario={handleSelectScenario}
         onVerifyLab={handleVerifyLab}
         onResetScenario={handleResetScenario}
+        onBackToOverview={() => setView('landing')}
         passingCount={passingCount}
         totalCount={testResults.length}
       />
@@ -178,6 +210,9 @@ export function App() {
               isStandardAcl={parsedAcl.isStandardAcl}
               scenario={activeScenario}
               matchedRuleIndex={activeTrace?.matchedRuleIndex ?? null}
+              showSolution={showSolution}
+              onToggleSolution={() => setShowSolution((prev) => !prev)}
+              onLoadSolution={handleLoadSolution}
             />
           </div>
 

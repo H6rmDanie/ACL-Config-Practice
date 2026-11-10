@@ -8,8 +8,11 @@ import {
   ArrowDown,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
   Code2,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { ACLRule, Action, LabScenario, Protocol } from '../types/acl';
 import {
@@ -28,12 +31,19 @@ interface AclEditorPanelProps {
   isStandardAcl: boolean;
   scenario: LabScenario;
   matchedRuleIndex: number | null;
+  showSolution: boolean;
+  onToggleSolution: () => void;
+  onLoadSolution: () => void;
 }
 
 function highlightIosLine(line: string): React.ReactNode {
   const trimmed = line.trim();
   if (!trimmed) return <span>&nbsp;</span>;
-  if (trimmed.startsWith('!') || trimmed.startsWith('#') || trimmed.toLowerCase().startsWith('remark')) {
+  if (
+    trimmed.startsWith('!') ||
+    trimmed.startsWith('#') ||
+    trimmed.toLowerCase().startsWith('remark')
+  ) {
     return <span className="text-slate-500 italic">{line}</span>;
   }
 
@@ -124,6 +134,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
   isStandardAcl,
   scenario,
   matchedRuleIndex,
+  showSolution,
+  onToggleSolution,
+  onLoadSolution,
 }) => {
   const [editorMode, setEditorMode] = useState<'cli' | 'table'>('cli');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -142,7 +155,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
   };
 
   const handleUpdateRule = (index: number, patch: Partial<ACLRule>) => {
-    const sorted = [...rules].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    const sorted = [...rules].sort(
+      (a, b) => a.sequenceNumber - b.sequenceNumber
+    );
     const target = { ...sorted[index], ...patch };
     target.rawText = formatSingleRuleCli(target, aclHeader).trim();
     sorted[index] = target;
@@ -150,17 +165,20 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
   };
 
   const handleDeleteRule = (index: number) => {
-    const sorted = [...rules].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    const sorted = [...rules].sort(
+      (a, b) => a.sequenceNumber - b.sequenceNumber
+    );
     sorted.splice(index, 1);
     syncRulesToCli(sorted);
   };
 
   const handleMoveRule = (index: number, direction: -1 | 1) => {
-    const sorted = [...rules].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    const sorted = [...rules].sort(
+      (a, b) => a.sequenceNumber - b.sequenceNumber
+    );
     const swapIdx = index + direction;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
 
-    // Swap sequence numbers so ordering updates cleanly
     const seqA = sorted[index].sequenceNumber;
     const seqB = sorted[swapIdx].sequenceNumber;
     sorted[index] = { ...sorted[index], sequenceNumber: seqB };
@@ -169,7 +187,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
   };
 
   const handleAddRule = () => {
-    const sorted = [...rules].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    const sorted = [...rules].sort(
+      (a, b) => a.sequenceNumber - b.sequenceNumber
+    );
     const maxSeq = sorted.reduce((max, r) => Math.max(max, r.sequenceNumber), 0);
     const nextSeq = Math.floor((maxSeq + 10) / 10) * 10;
 
@@ -184,7 +204,11 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
       dstIp: '0.0.0.0',
       dstWildcard: '255.255.255.255',
       dstPort: isStandardAcl ? undefined : 80,
-      aclHeader: aclHeader || (isStandardAcl ? 'access-list 10' : 'ip access-list extended LAB_ACL'),
+      aclHeader:
+        aclHeader ||
+        (isStandardAcl
+          ? 'access-list 10'
+          : 'ip access-list extended LAB_ACL'),
       isStandard: isStandardAcl,
     };
     newRule.rawText = formatSingleRuleCli(newRule, aclHeader).trim();
@@ -245,19 +269,32 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
           </span>
         </div>
 
-        {/* Right Quick Helpers */}
+        {/* Right Controls: Optional Solution Viewer Toggle + Add ACE */}
         <div className="flex items-center gap-1.5">
-          {scenario.solutionAclText && (
-            <button
-              type="button"
-              onClick={() => onChangeCliText(scenario.solutionAclText!)}
-              className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 flex items-center gap-1 transition"
-              title="Load verified CCNA reference ACL configuration"
-            >
-              <Sparkles className="w-3 h-3 text-indigo-400" />
-              Load Reference ACL
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onToggleSolution}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition ${
+              showSolution
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-700'
+            }`}
+            title="Reveal or hide the reference CCNA solution for this scenario"
+          >
+            {showSolution ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                <span>Hide Solution</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3 h-3 text-amber-400" />
+                <Eye className="w-3.5 h-3.5 text-slate-400" />
+                <span>Show Solution</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={handleAddRule}
@@ -268,6 +305,33 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Optional Collapsible Reference Solution Viewer */}
+      {showSolution && (
+        <div className="px-3.5 py-2.5 bg-amber-950/25 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 mb-1">
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Reference IOS Solution (Unlocked)</span>
+            </div>
+            <pre className="text-[11px] font-mono bg-slate-950/90 border border-amber-500/20 rounded-lg p-2 overflow-x-auto leading-5">
+              {scenario.solutionAclText.split(/\r?\n/).map((line, i) => (
+                <div key={i}>{highlightIosLine(line)}</div>
+              ))}
+            </pre>
+          </div>
+          <div className="shrink-0 flex sm:flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={onLoadSolution}
+              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
+            >
+              <Unlock className="w-3.5 h-3.5" />
+              Load Answer into Editor
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Editor Content */}
       {editorMode === 'cli' ? (
@@ -311,7 +375,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
             {/* Line Numbers Gutter */}
             <div className="w-10 py-3 bg-slate-900/50 border-r border-slate-800/80 text-right pr-2 select-none text-slate-500 text-xs leading-6 shrink-0">
               {cliLines.map((_, idx) => {
-                const hasError = parseErrors.some((e) => e.lineNumber === idx + 1);
+                const hasError = parseErrors.some(
+                  (e) => e.lineNumber === idx + 1
+                );
                 return (
                   <div
                     key={idx}
@@ -331,7 +397,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
                 className="absolute inset-0 m-0 py-3 px-3.5 font-mono text-xs leading-6 whitespace-pre overflow-auto pointer-events-none select-none"
               >
                 {cliLines.map((line, idx) => {
-                  const hasError = parseErrors.some((e) => e.lineNumber === idx + 1);
+                  const hasError = parseErrors.some(
+                    (e) => e.lineNumber === idx + 1
+                  );
                   return (
                     <div
                       key={idx}
@@ -355,7 +423,7 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
                 autoComplete="off"
                 autoCorrect="off"
                 aria-label="Cisco IOS ACL CLI Editor"
-                placeholder="Enter Cisco IOS ACL commands (e.g. access-list 100 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.10 eq 80)"
+                placeholder="! Enter your Cisco IOS ACL configuration here..."
                 className="absolute inset-0 w-full h-full m-0 py-3 px-3.5 font-mono text-xs leading-6 whitespace-pre bg-transparent text-transparent caret-cyan-400 resize-none focus:outline-none overflow-auto selection:bg-cyan-500/25"
               />
             </div>
@@ -378,158 +446,118 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 text-xs font-mono">
-              {rules.map((rule, idx) => {
-                const isMatchedRow = matchedRuleIndex === idx;
-                return (
-                  <tr
-                    key={rule.id}
-                    className={`transition ${
-                      isMatchedRow
-                        ? 'bg-cyan-500/10'
-                        : 'hover:bg-slate-900/60'
-                    }`}
+              {rules.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="py-6 px-4 text-center text-slate-400 font-sans text-xs"
                   >
-                    {/* Sequence Number */}
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        min={1}
-                        step={10}
-                        value={rule.sequenceNumber}
-                        onChange={(e) =>
-                          handleUpdateRule(idx, {
-                            sequenceNumber: Math.max(
-                              1,
-                              parseInt(e.target.value || '10', 10)
-                            ),
-                          })
-                        }
-                        className="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-orange-300 focus:outline-none focus:border-cyan-500"
-                      />
-                    </td>
-
-                    {/* Action */}
-                    <td className="py-2 px-2">
-                      <select
-                        value={rule.action}
-                        onChange={(e) =>
-                          handleUpdateRule(idx, {
-                            action: e.target.value as Action,
-                          })
-                        }
-                        className={`bg-slate-900 border rounded px-2 py-1 text-xs font-bold uppercase focus:outline-none ${
-                          rule.action === 'permit'
-                            ? 'border-emerald-500/40 text-emerald-400'
-                            : 'border-rose-500/40 text-rose-400'
-                        }`}
-                      >
-                        <option value="permit">PERMIT</option>
-                        <option value="deny">DENY</option>
-                      </select>
-                    </td>
-
-                    {/* Protocol */}
-                    <td className="py-2 px-2">
-                      <select
-                        value={rule.protocol}
-                        disabled={Boolean(rule.isStandard)}
-                        onChange={(e) => {
-                          const proto = e.target.value as Protocol;
-                          handleUpdateRule(idx, {
-                            protocol: proto,
-                            dstPort:
-                              proto === 'tcp' || proto === 'udp'
-                                ? rule.dstPort
-                                : undefined,
-                            established:
-                              proto === 'tcp' ? rule.established : undefined,
-                            icmpType:
-                              proto === 'icmp' ? rule.icmpType : undefined,
-                          });
-                        }}
-                        className="bg-slate-900 border border-slate-700 disabled:opacity-40 rounded px-2 py-1 text-xs uppercase text-violet-300 focus:outline-none focus:border-cyan-500"
-                      >
-                        <option value="tcp">TCP</option>
-                        <option value="udp">UDP</option>
-                        <option value="icmp">ICMP</option>
-                        <option value="ip">IP</option>
-                      </select>
-                    </td>
-
-                    {/* Source IP & Wildcard */}
-                    <td className="py-2 px-2">
-                      <div className="flex items-center gap-1">
+                    No explicit ACE rules configured yet. Click{' '}
+                    <strong className="text-emerald-300">+ Add ACE</strong> or type
+                    commands in the{' '}
+                    <strong className="text-cyan-300">CLI Terminal</strong> to
+                    build your ACL.
+                  </td>
+                </tr>
+              ) : (
+                rules.map((rule, idx) => {
+                  const isMatchedRow = matchedRuleIndex === idx;
+                  return (
+                    <tr
+                      key={rule.id}
+                      className={`transition ${
+                        isMatchedRow
+                          ? 'bg-cyan-500/10'
+                          : 'hover:bg-slate-900/60'
+                      }`}
+                    >
+                      {/* Sequence Number */}
+                      <td className="py-2 px-2">
                         <input
-                          type="text"
-                          value={rule.srcIp}
-                          onChange={(e) =>
-                            handleUpdateRule(idx, { srcIp: e.target.value.trim() })
-                          }
-                          placeholder="Src IP"
-                          className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-cyan-200 focus:outline-none focus:border-cyan-500"
-                        />
-                        <input
-                          type="text"
-                          value={rule.srcWildcard}
+                          type="number"
+                          min={1}
+                          step={10}
+                          value={rule.sequenceNumber}
                           onChange={(e) =>
                             handleUpdateRule(idx, {
-                              srcWildcard: e.target.value.trim(),
+                              sequenceNumber: Math.max(
+                                1,
+                                parseInt(e.target.value || '10', 10)
+                              ),
                             })
                           }
-                          placeholder="Wildcard"
-                          className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+                          className="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-orange-300 focus:outline-none focus:border-cyan-500"
                         />
-                        <button
-                          type="button"
-                          title="Set Source to host (0.0.0.0)"
-                          onClick={() =>
-                            handleUpdateRule(idx, { srcWildcard: '0.0.0.0' })
-                          }
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
-                        >
-                          host
-                        </button>
-                        <button
-                          type="button"
-                          title="Set Source to any (0.0.0.0 255.255.255.255)"
-                          onClick={() =>
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-2 px-2">
+                        <select
+                          value={rule.action}
+                          onChange={(e) =>
                             handleUpdateRule(idx, {
-                              srcIp: '0.0.0.0',
-                              srcWildcard: '255.255.255.255',
+                              action: e.target.value as Action,
                             })
                           }
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                          className={`bg-slate-900 border rounded px-2 py-1 text-xs font-bold uppercase focus:outline-none ${
+                            rule.action === 'permit'
+                              ? 'border-emerald-500/40 text-emerald-400'
+                              : 'border-rose-500/40 text-rose-400'
+                          }`}
                         >
-                          any
-                        </button>
-                      </div>
-                    </td>
+                          <option value="permit">PERMIT</option>
+                          <option value="deny">DENY</option>
+                        </select>
+                      </td>
 
-                    {/* Destination IP & Wildcard */}
-                    <td className="py-2 px-2">
-                      {rule.isStandard ? (
-                        <span className="text-[11px] text-slate-500 italic">
-                          any (Standard ACL)
-                        </span>
-                      ) : (
+                      {/* Protocol */}
+                      <td className="py-2 px-2">
+                        <select
+                          value={rule.protocol}
+                          disabled={Boolean(rule.isStandard)}
+                          onChange={(e) => {
+                            const proto = e.target.value as Protocol;
+                            handleUpdateRule(idx, {
+                              protocol: proto,
+                              dstPort:
+                                proto === 'tcp' || proto === 'udp'
+                                  ? rule.dstPort
+                                  : undefined,
+                              established:
+                                proto === 'tcp' ? rule.established : undefined,
+                              icmpType:
+                                proto === 'icmp' ? rule.icmpType : undefined,
+                            });
+                          }}
+                          className="bg-slate-900 border border-slate-700 disabled:opacity-40 rounded px-2 py-1 text-xs uppercase text-violet-300 focus:outline-none focus:border-cyan-500"
+                        >
+                          <option value="tcp">TCP</option>
+                          <option value="udp">UDP</option>
+                          <option value="icmp">ICMP</option>
+                          <option value="ip">IP</option>
+                        </select>
+                      </td>
+
+                      {/* Source IP & Wildcard */}
+                      <td className="py-2 px-2">
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
-                            value={rule.dstIp}
+                            value={rule.srcIp}
                             onChange={(e) =>
                               handleUpdateRule(idx, {
-                                dstIp: e.target.value.trim(),
+                                srcIp: e.target.value.trim(),
                               })
                             }
-                            placeholder="Dst IP"
+                            placeholder="Src IP"
                             className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-cyan-200 focus:outline-none focus:border-cyan-500"
                           />
                           <input
                             type="text"
-                            value={rule.dstWildcard}
+                            value={rule.srcWildcard}
                             onChange={(e) =>
                               handleUpdateRule(idx, {
-                                dstWildcard: e.target.value.trim(),
+                                srcWildcard: e.target.value.trim(),
                               })
                             }
                             placeholder="Wildcard"
@@ -537,9 +565,9 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
                           />
                           <button
                             type="button"
-                            title="Set Destination to host (0.0.0.0)"
+                            title="Set Source to host (0.0.0.0)"
                             onClick={() =>
-                              handleUpdateRule(idx, { dstWildcard: '0.0.0.0' })
+                              handleUpdateRule(idx, { srcWildcard: '0.0.0.0' })
                             }
                             className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
                           >
@@ -547,11 +575,11 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
                           </button>
                           <button
                             type="button"
-                            title="Set Destination to any (0.0.0.0 255.255.255.255)"
+                            title="Set Source to any (0.0.0.0 255.255.255.255)"
                             onClick={() =>
                               handleUpdateRule(idx, {
-                                dstIp: '0.0.0.0',
-                                dstWildcard: '255.255.255.255',
+                                srcIp: '0.0.0.0',
+                                srcWildcard: '255.255.255.255',
                               })
                             }
                             className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
@@ -559,104 +587,163 @@ export const AclEditorPanel: React.FC<AclEditorPanelProps> = ({
                             any
                           </button>
                         </div>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Destination Port */}
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={65535}
-                        disabled={
-                          Boolean(rule.isStandard) ||
-                          (rule.protocol !== 'tcp' && rule.protocol !== 'udp')
-                        }
-                        value={rule.dstPort ?? ''}
-                        onChange={(e) =>
-                          handleUpdateRule(idx, {
-                            dstPort: e.target.value
-                              ? parseInt(e.target.value, 10)
-                              : undefined,
-                          })
-                        }
-                        placeholder="any"
-                        className="w-20 bg-slate-900 border border-slate-700 disabled:opacity-40 rounded px-1.5 py-1 text-xs text-orange-300 focus:outline-none focus:border-cyan-500"
-                      />
-                    </td>
+                      {/* Destination IP & Wildcard */}
+                      <td className="py-2 px-2">
+                        {rule.isStandard ? (
+                          <span className="text-[11px] text-slate-500 italic">
+                            any (Standard ACL)
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={rule.dstIp}
+                              onChange={(e) =>
+                                handleUpdateRule(idx, {
+                                  dstIp: e.target.value.trim(),
+                                })
+                              }
+                              placeholder="Dst IP"
+                              className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-cyan-200 focus:outline-none focus:border-cyan-500"
+                            />
+                            <input
+                              type="text"
+                              value={rule.dstWildcard}
+                              onChange={(e) =>
+                                handleUpdateRule(idx, {
+                                  dstWildcard: e.target.value.trim(),
+                                })
+                              }
+                              placeholder="Wildcard"
+                              className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+                            />
+                            <button
+                              type="button"
+                              title="Set Destination to host (0.0.0.0)"
+                              onClick={() =>
+                                handleUpdateRule(idx, {
+                                  dstWildcard: '0.0.0.0',
+                                })
+                              }
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                            >
+                              host
+                            </button>
+                            <button
+                              type="button"
+                              title="Set Destination to any (0.0.0.0 255.255.255.255)"
+                              onClick={() =>
+                                handleUpdateRule(idx, {
+                                  dstIp: '0.0.0.0',
+                                  dstWildcard: '255.255.255.255',
+                                })
+                              }
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300"
+                            >
+                              any
+                            </button>
+                          </div>
+                        )}
+                      </td>
 
-                    {/* Options (established / icmpType) */}
-                    <td className="py-2 px-2">
-                      {rule.protocol === 'tcp' && !rule.isStandard ? (
-                        <label className="inline-flex items-center gap-1 text-[10px] text-amber-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(rule.established)}
-                            onChange={(e) =>
-                              handleUpdateRule(idx, {
-                                established: e.target.checked || undefined,
-                              })
-                            }
-                            className="rounded border-slate-700 bg-slate-900 text-cyan-500"
-                          />
-                          estab
-                        </label>
-                      ) : rule.protocol === 'icmp' && !rule.isStandard ? (
-                        <select
-                          value={rule.icmpType ?? ''}
+                      {/* Destination Port */}
+                      <td className="py-2 px-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={65535}
+                          disabled={
+                            Boolean(rule.isStandard) ||
+                            (rule.protocol !== 'tcp' && rule.protocol !== 'udp')
+                          }
+                          value={rule.dstPort ?? ''}
                           onChange={(e) =>
                             handleUpdateRule(idx, {
-                              icmpType: (e.target.value || undefined) as
-                                | 'echo'
-                                | 'echo-reply'
-                                | undefined,
+                              dstPort: e.target.value
+                                ? parseInt(e.target.value, 10)
+                                : undefined,
                             })
                           }
-                          className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-amber-300"
-                        >
-                          <option value="">any</option>
-                          <option value="echo">echo</option>
-                          <option value="echo-reply">echo-reply</option>
-                        </select>
-                      ) : (
-                        <span className="text-[10px] text-slate-600">—</span>
-                      )}
-                    </td>
+                          placeholder="any"
+                          className="w-20 bg-slate-900 border border-slate-700 disabled:opacity-40 rounded px-1.5 py-1 text-xs text-orange-300 focus:outline-none focus:border-cyan-500"
+                        />
+                      </td>
 
-                    {/* Move Up / Down / Delete */}
-                    <td className="py-2 px-2 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleMoveRule(idx, -1)}
-                          disabled={idx === 0}
-                          className="p-1 rounded hover:bg-slate-800 text-slate-400 disabled:opacity-30"
-                          title="Move rule up"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMoveRule(idx, 1)}
-                          disabled={idx === rules.length - 1}
-                          className="p-1 rounded hover:bg-slate-800 text-slate-400 disabled:opacity-30"
-                          title="Move rule down"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRule(idx)}
-                          className="p-1 rounded hover:bg-rose-950/60 text-rose-400"
-                          title="Delete rule"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      {/* Options (established / icmpType) */}
+                      <td className="py-2 px-2">
+                        {rule.protocol === 'tcp' && !rule.isStandard ? (
+                          <label className="inline-flex items-center gap-1 text-[10px] text-amber-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(rule.established)}
+                              onChange={(e) =>
+                                handleUpdateRule(idx, {
+                                  established: e.target.checked || undefined,
+                                })
+                              }
+                              className="rounded border-slate-700 bg-slate-900 text-cyan-500"
+                            />
+                            estab
+                          </label>
+                        ) : rule.protocol === 'icmp' && !rule.isStandard ? (
+                          <select
+                            value={rule.icmpType ?? ''}
+                            onChange={(e) =>
+                              handleUpdateRule(idx, {
+                                icmpType: (e.target.value || undefined) as
+                                  | 'echo'
+                                  | 'echo-reply'
+                                  | undefined,
+                              })
+                            }
+                            className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-amber-300"
+                          >
+                            <option value="">any</option>
+                            <option value="echo">echo</option>
+                            <option value="echo-reply">echo-reply</option>
+                          </select>
+                        ) : (
+                          <span className="text-[10px] text-slate-600">—</span>
+                        )}
+                      </td>
+
+                      {/* Move Up / Down / Delete */}
+                      <td className="py-2 px-2 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRule(idx, -1)}
+                            disabled={idx === 0}
+                            className="p-1 rounded hover:bg-slate-800 text-slate-400 disabled:opacity-30"
+                            title="Move rule up"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRule(idx, 1)}
+                            disabled={idx === rules.length - 1}
+                            className="p-1 rounded hover:bg-slate-800 text-slate-400 disabled:opacity-30"
+                            title="Move rule down"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRule(idx)}
+                            className="p-1 rounded hover:bg-rose-950/60 text-rose-400"
+                            title="Delete rule"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
 
               {/* Implicit Deny Footer Row */}
               <tr className="bg-slate-900/40 text-slate-500 italic">

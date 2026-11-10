@@ -7,6 +7,7 @@ import {
   Terminal,
   ChevronDown,
   Award,
+  ArrowLeft,
 } from 'lucide-react';
 import { LabScenario } from '../types/acl';
 
@@ -16,6 +17,7 @@ interface HeaderBarProps {
   onSelectScenario: (scenarioId: string) => void;
   onVerifyLab: () => void;
   onResetScenario: () => void;
+  onBackToOverview: () => void;
   passingCount: number;
   totalCount: number;
 }
@@ -26,6 +28,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onSelectScenario,
   onVerifyLab,
   onResetScenario,
+  onBackToOverview,
   passingCount,
   totalCount,
 }) => {
@@ -39,29 +42,39 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       : 'bg-rose-500/15 text-rose-300 border-rose-500/30';
 
   return (
-    <header className="h-14 border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 flex items-center justify-between gap-4 shrink-0">
-      {/* Brand Title */}
+    <header className="min-h-14 py-2 border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      {/* Left: Back to Overview + Brand Title */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
-          <Terminal className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-sm font-bold tracking-wide text-slate-100">
-              CCNA 200-301 ACL Lab Simulator
-            </h1>
-            <span className="hidden sm:inline-block text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
-              IOS 15.x Engine
-            </span>
+        <button
+          type="button"
+          onClick={onBackToOverview}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-500/40 text-xs font-medium transition"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Overview</span>
+        </button>
+
+        <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
+            <Terminal className="w-4 h-4" />
           </div>
-          <p className="text-[11px] text-slate-400 hidden md:block">
-            Interactive Bitwise Wildcard & Sequential Packet Filter Workbench
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold tracking-wide text-slate-100">
+                Cisco ACL Lab Studio
+              </h1>
+              <span className="hidden md:inline-block text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                CCNA 200-301
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Scenario Selector Dropdown */}
-      <div className="flex items-center gap-3 flex-1 max-w-xl justify-center">
+      {/* Center: Scenario Selector Dropdown */}
+      <div className="flex items-center gap-2.5 flex-1 max-w-xl justify-center">
         <div className="relative flex-1 max-w-md">
           <select
             aria-label="Select Lab Scenario"
@@ -79,7 +92,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         </div>
 
         <span
-          className={`hidden lg:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border ${difficultyColor}`}
+          className={`hidden xl:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border ${difficultyColor}`}
         >
           <Award className="w-3.5 h-3.5" />
           {activeScenario.difficulty}
@@ -87,20 +100,24 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       </div>
 
       {/* Right Controls: Score Badge + Reset + Verify Lab */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <div
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
             allPassing
               ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-950'
               : passingCount > 0
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-              : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+              : 'bg-slate-950 border-slate-800 text-slate-400'
           }`}
         >
           {allPassing ? (
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           ) : (
-            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <ShieldAlert
+              className={`w-4 h-4 shrink-0 ${
+                passingCount > 0 ? 'text-amber-400' : 'text-slate-500'
+              }`}
+            />
           )}
           <span className="font-mono">
             {passingCount} / {totalCount} Test Cases Passing
@@ -110,11 +127,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         <button
           type="button"
           onClick={onResetScenario}
-          title="Reset ACL to scenario initial configuration"
-          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition text-xs flex items-center gap-1.5"
+          title="Reset ACL editor to blank starter state and reset test score to 0"
+          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition text-xs font-medium flex items-center gap-1.5"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span className="hidden xl:inline">Reset</span>
+          <span>Reset</span>
         </button>
 
         <button
